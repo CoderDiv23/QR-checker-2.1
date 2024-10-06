@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Validator</title>
+    <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: Arial, sans-serif;
+        }
+        .scanner-box {
+            width: 300px;
+            height: 300px;
+            border: 2px solid #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        #reader {
+            width: 100%;
+            height: 100%;
+        }
+        #result {
+            margin-top: 20px;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="scanner-box">
+    <div id="reader"></div>
+</div>
+<p id="result"></p>
+
+<script>
+    const googleScriptUrl = "https://script.google.com/macros/s/AKfycbwY-K9a4Sz2AstR_04eHqkljhfVN0s57hNe2lpMiOOaKBfSZJrF9bCJ3LdeCIg2t_Lc/exec
+";
+
+    // Function to check QR code against Google Sheet
+    async function checkQrCode(qrCode) {
+        const response = await fetch(`${googleScriptUrl}?qrCode=${qrCode}&action=check`);
+        const status = await response.text();
+        document.getElementById("result").textContent = `QR Code is ${status}`;
+        
+        // If valid, update status in the sheet
+        if (status === "Valid") {
+            await fetch(`${googleScriptUrl}?qrCode=${qrCode}&action=update&status=Valid`);
+        }
+    }
+
+    // QR code scanner configuration
+    function onScanSuccess(decodedText) {
+        console.log(`QR Code scanned: ${decodedText}`);
+        checkQrCode(decodedText);
+    }
+
+    function onScanFailure(error) {
+        console.warn(`QR Code scan error: ${error}`);
+    }
+
+    // Function to start the camera and the QR scanner
+    function startQrScanner() {
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+        .then((stream) => {
+            // If permission is granted, initialize the QR code scanner
+            const html5QrCode = new Html5Qrcode("reader");
+            html5QrCode.start(
+                { facingMode: "environment" }, 
+                { fps: 10, qrbox: 250 }, 
+                onScanSuccess, 
+                onScanFailure
+            );
+        })
+        .catch((err) => {
+            // If permission is denied, show a user-friendly message
+            console.error("Camera access denied:", err);
+            document.getElementById("result").textContent = "Camera access denied. Please allow camera access to use the QR scanner.";
+        });
+    }
+
+    // Add a button to request camera access manually
+    const accessButton = document.createElement("button");
+    accessButton.innerHTML = "Start QR Scanner";
+    accessButton.onclick = startQrScanner;
+    document.body.appendChild(accessButton);
+
+    // Optionally, hide the button once camera access is granted
+    function hideAccessButton() {
+        accessButton.style.display = "none";
+    }
+
+    // Start QR scanner only after permission is granted
+    navigator.permissions.query({name: 'camera'}).then(function(permissionStatus) {
+        if (permissionStatus.state === "granted") {
+            startQrScanner();
+            hideAccessButton(); // Hide button when camera permission is granted
+        }
+    });
+</script>
+
+</body>
+</html>
